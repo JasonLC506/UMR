@@ -1,0 +1,9 @@
+ckpt/*
+log/*
+result/*
+.idea/*
+venv/*
+summary/*
+data/*
+test.py
+*.pyc
