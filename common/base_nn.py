@@ -73,6 +73,7 @@ class NN(object):
             op_data_size=None,
             fn_op_update=lambda x: None,
             batch_size=512,
+            epoch_start=0,
             max_epoch=10,
             verbose=True,
             op_savers=None,
@@ -90,6 +91,7 @@ class NN(object):
         :param op_data_size: tf operator to calculate effective data size
         :param batch_size:
         :param max_epoch:
+        :param epoch_start:
         :param session:
         :param verbose: print result every epoch
         :param op_savers: tf operator of saver
@@ -107,7 +109,7 @@ class NN(object):
             log_board = LogBoard(directory=log_board_dir)
         else:
             log_board = LogBoardFake()
-        for epoch in range(max_epoch):
+        for epoch in range(epoch_start, max_epoch):
             epoch_losses = [np.zeros(1) for _ in range(len(op_losses))]
             data_sizes = 0
             i_batch = 0

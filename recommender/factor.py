@@ -89,6 +89,7 @@ class Factor(NN):
     def train(
             self,
             data_generator,
+            epoch_start=0,
     ):
         if self.sess is None:
             self.initialization()
@@ -100,6 +101,7 @@ class Factor(NN):
             session=self.sess,
             batch_size=self.model_spec["batch_size"],
             max_epoch=self.model_spec["max_epoch"],
+            epoch_start=epoch_start,
             op_savers=[self.saver],
             save_path_prefixs=[self.model_name],
             log_board_dir="../summary/" + self.model_name

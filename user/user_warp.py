@@ -41,16 +41,27 @@ class User(object):
         :param candidates: [[candidate of length k] for u in self.users().tolist()]
         :return: [item_clicked]
         """
+        scores_list = self.rate(candidates=candidates)
+        feedbacks = []
+        for i in range(len(scores_list)):
+            scores = scores_list[i]
+            feedback_ind = np.argsort(scores)[-1]           # select highest score item
+            feedback = candidates[i][feedback_ind]
+            feedbacks.append(feedback)
+        return feedbacks, scores_list
+
+    def rate(
+            self,
+            candidates,
+    ):
         cand_data_loader = DataLoaderRecUsersCand(
             candidates=candidates,
             users=self.users()
         )
-        feedbacks = []
+        scores_list = []
         for i in range(cand_data_loader.n_users_effect):
             scores = self.model.predict(
                 data_generator=cand_data_loader
             )
-            feedback_ind = np.argsort(scores)[-1]           # select highest score item
-            feedback = candidates[i][feedback_ind]
-            feedbacks.append(feedback)
-        return feedbacks
+            scores_list.append(scores)
+        return scores_list

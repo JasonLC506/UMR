@@ -1,19 +1,16 @@
 """
-iterative training
-@article{Chaney2018,
-author = {Chaney, Allison J. B. and Stewart, Brandon M. and Engelhardt, Barbara E.},
-pages = {224--232},
-title = {{How algorithmic confounding in recommendation systems increases homogeneity and decreases utility}},
-year = {2018}
-}
+train recommender model,
+interact with user model
 """
 import numpy as np
+import pickle
+
 from data_synthesizer import uv_emb_synthesize
-from recommender import Recommender
+from recommender import RecommenderSeq
 from user import User
 from experiment import (
     Interactor,
-    train_static_with_static as train
+    train_seq_w_static
 )
 
 
@@ -22,7 +19,7 @@ if __name__ == "__main__":
     n_items = 1000
     emb_dim = 20
     random_seed = 2020
-    data_file = "../data/test_full_ideal"
+    data_file = "../data/synthetic_knn"
     np.random.seed(random_seed)
 
     # --------------------- initial data generation ---------------------- #
@@ -44,8 +41,8 @@ if __name__ == "__main__":
     )
     print("done synthesize embedding")
 
-    recommender = Recommender(
-        model="factor",
+    recommender = RecommenderSeq(
+        model="sequence",
         n_users=n_users,
         n_items=n_items,
         model_spec={
@@ -53,12 +50,12 @@ if __name__ == "__main__":
             "batch_size": 512,
             "max_epoch": 3,
             "emb_dim": 20,
+            "max_hist_length": 100,
         },
         model_name="factor_rec"
     )
     recommender.model.initialization(
         item_emb_data=np.random.random(size=[n_items, emb_dim]),
-        user_emb_data=np.random.random(size=[n_users, emb_dim])
     )
     print("done initialize recommender")
 
@@ -88,33 +85,30 @@ if __name__ == "__main__":
         }
     )
 
-    # --------------------- interact --------------------------- #
-    interactor.iterate(
-        steps=10,
+    _, candidates_steps_init, feedback_steps_init, scores_steps_init = interactor.iterate(
+        steps=1,
         k=10,
-        random_rec=True
+        random_rec=True,
+        max_length_input=100
     )
-    print("done start-up iterations")
+    # --------------------- interact --------------------------- #
 
+    # item-KNN setting (item embedding using ground truth)#
     interactor.recommender.model.initialization(
         item_emb_file="../data/emb/item",
-        user_emb_file="../data/emb/user"
     )
-    for i in range(990):
-        # --------------------- train ------------------------- #
-        # interactor.recommender.model.initialization(
-        #     item_emb_data=np.random.random(size=[n_items, emb_dim]),
-        #     user_emb_data=np.random.random(size=[n_users, emb_dim])
-        # )
-        # train(
-        #     n_users=n_users,
-        #     n_items=n_items,
-        #     data_file=data_file,
-        #     rec_model=interactor.recommender.model
-        # )
-        interactor.iterate(
-            steps=1,
-            k=10,
-            random_rec=False
+    _, candidates_steps, feedback_steps, scores_steps = interactor.iterate(
+        steps=100,
+        k=10,
+        random_rec=False,
+        max_length_input=100
+    )
+    with open(data_file + "_detail", "wb") as f:
+        pickle.dump(
+            [
+                candidates_steps_init + candidates_steps,
+                feedback_steps_init + feedback_steps,
+                scores_steps_init + scores_steps,
+            ],
+            f
         )
-        print("done iteration %d" % i)

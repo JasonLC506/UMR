@@ -12,6 +12,7 @@ class Sequence(Factor):
             n_items,
             model_spec,
             model_name=None,
+            **kwargs
     ):
         self.n_items = n_items
         self.model_spec = model_spec
@@ -24,7 +25,7 @@ class Sequence(Factor):
             item_emb_file=None,
             item_emb_data=None,
     ):
-        self.sess.self.setup_session(graph=self.graph)
+        self.sess = self.setup_session(graph=self.graph)
         self.initialize(sess=self.sess)
         self.initialize_fixed_input(
             sess=self.sess,
@@ -65,6 +66,7 @@ class Sequence(Factor):
     ):
         feed_dict = {
             self.hist_v: data["hist_v"][batch_index],
+            self.hist_length: data["hist_length"][batch_index],
             self.v: data["v"][batch_index],
             self.vn: data["vn"][batch_index]
         }
@@ -83,13 +85,25 @@ class Sequence(Factor):
         """
         feed_dict = {
             self.hist_v: data["hist_v"],
+            self.hist_length: data["hist_length"],
             self.v: data["v"]
         }
         return feed_dict
 
     def _get_u_emb(self):
+        self.v_emb_pad = tf.Variable(
+            tf.zeros(
+                shape=(1, self.model_spec["emb_dim"]),
+                dtype=tf.float32
+            ),
+            trainable=False
+        )
+        v_emb_w_pad = tf.concat(
+            [self.v_emb, self.v_emb_pad],
+            axis=0
+        )
         hist_ve = tf.nn.embedding_lookup(
-            params=self.v_emb,
+            params=v_emb_w_pad,
             ids=self.hist_v
         )
         ue = self._setup_hist_aggregation(
@@ -109,6 +123,6 @@ class Sequence(Factor):
     def _setup_emb(self):
         self.v_emb, self.v_emb_placeholder, self.v_emb_init = self.fixed_input_load(
             input_shape=[self.n_items, self.model_spec["emb_dim"]],
-            trainable=False,
+            trainable=True,
             name="v_emb"
         )

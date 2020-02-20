@@ -35,3 +35,28 @@ def save_emb(
 ):
     with open(fn, 'wb') as f:
         pickle.dump(embs, f)
+
+
+def uv_emb_synthesize(
+        n_users,
+        n_items,
+        model_spec,
+        save_path="../data/emb/",
+):
+    """
+    generate user/item embeddings
+    """
+    user_embs = generate_emb(
+        n=n_users,
+        dim=model_spec["dim"],
+        model_spec=model_spec["user"]
+    )
+    item_embs = generate_emb(
+        n=n_items,
+        dim=model_spec["dim"],
+        model_spec=model_spec["item"]
+    )
+    if save_path is not None:
+        save_emb(user_embs, save_path + "user")
+        save_emb(item_embs, save_path + "item")
+    return user_embs, item_embs
