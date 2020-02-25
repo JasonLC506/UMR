@@ -4,8 +4,10 @@ interact with user model
 """
 import numpy as np
 import pickle
+import copy
+import time
 
-from data_synthesizer import uv_emb_synthesize
+from data_synthesizer import emb_synthesize
 from recommender import RecommenderSeq
 from user import User
 from experiment import (
@@ -14,31 +16,53 @@ from experiment import (
 )
 
 
+def get_optim_score_step(
+        optim_scores,
+        recommender,
+        k
+):
+    optim_scores_step = []
+    for uid in range(len(optim_scores)):
+        inds = recommender.exclude_sort(
+            scores=copy.deepcopy(optim_scores[uid]),
+            excluded_indices=recommender.user_feedbacks[uid],
+            k=k
+        )
+        optim_scores_step.append(optim_scores[uid][inds])
+    return optim_scores_step
+
+
 if __name__ == "__main__":
     n_users = 100
-    n_items = 1000
-    emb_dim = 20
+    n_items = 10000
+    emb_dim = 25
     random_seed = 2020
-    data_file = "../data/synthetic_knn"
+    k = 10
+    data_file = "../data/synthetic_KNN_random_10Kitem_25_1000steps"
+    item_emb_path = "../data/emb/item_10k_25"
+    user_emb_path = "../data/emb/user_new_25"
     np.random.seed(random_seed)
 
     # --------------------- initial data generation ---------------------- #
-    _, _ = uv_emb_synthesize(
-        n_users=n_users,
-        n_items=n_items,
-        model_spec={
-            "dim": emb_dim,
-            "user": {
-                "common_init_alpha": 1.0,
-                "rescale_common": 10.0
-            },
-            "item": {
-                "common_init_alpha": 100,
-                "rescale_common": 0.1
-            }
-        },
-        save_path="../data/emb/",
-    )
+    # user_embs = emb_synthesize(
+    #     n=n_users,
+    #     model_spec={
+    #         "dim": emb_dim,
+    #         "common_init_alpha": 1.0,
+    #         "rescale_common": 10.0
+    #     },
+    #     save_path=user_emb_path
+    # )
+    # item_embs = emb_synthesize(
+    #     n=n_items,
+    #     model_spec={
+    #         "dim": emb_dim,
+    #         "common_init_alpha": 100.0,
+    #         "rescale_common": 0.1,
+    #     },
+    #     save_path=item_emb_path
+    # )
+    # print(item_embs.shape)
     print("done synthesize embedding")
 
     recommender = RecommenderSeq(
@@ -49,13 +73,19 @@ if __name__ == "__main__":
             "learning_rate": 0.01,
             "batch_size": 512,
             "max_epoch": 3,
-            "emb_dim": 20,
+            "emb_dim": emb_dim,
             "max_hist_length": 100,
         },
-        model_name="factor_rec"
+        model_name="sequence_rec"
     )
     recommender.model.initialization(
         item_emb_data=np.random.random(size=[n_items, emb_dim]),
+    )
+    # recommender.model.restore(
+    #     save_path="../ckpt/avg_item_emb/epoch_015"
+    # )
+    recommender.model.initialization(
+        item_emb_file=item_emb_path
     )
     print("done initialize recommender")
 
@@ -67,15 +97,22 @@ if __name__ == "__main__":
             "learning_rate": 0.01,
             "batch_size": 512,
             "max_epoch": 3,
-            "emb_dim": 20,
+            "emb_dim": emb_dim,
         },
         model_name="base_user"
     )
     user.model.initialization(
-        item_emb_file="../data/emb/item",
-        user_emb_file="../data/emb/user"
+        item_emb_file=item_emb_path,
+        user_emb_file=user_emb_path,
     )
     print("done initialize user")
+
+    optim_scores = user.rate(
+        [
+            np.arange(n_items) for _ in range(n_users)
+        ]
+    )
+    print("done calculating full optim scores")
 
     interactor = Interactor(
         user=user,
@@ -85,30 +122,56 @@ if __name__ == "__main__":
         }
     )
 
-    _, candidates_steps_init, feedback_steps_init, scores_steps_init = interactor.iterate(
+    optim_scores_steps = [
+        get_optim_score_step(
+            optim_scores=optim_scores,
+            recommender=interactor.recommender,
+            k=k,
+        )
+    ]
+    _, candidates_steps, feedback_steps, scores_steps, rec_u_embs_steps = interactor.iterate(
         steps=1,
-        k=10,
+        k=k,
         random_rec=True,
+        random_react=True,
         max_length_input=100
     )
     # --------------------- interact --------------------------- #
 
-    # item-KNN setting (item embedding using ground truth)#
-    interactor.recommender.model.initialization(
-        item_emb_file="../data/emb/item",
-    )
-    _, candidates_steps, feedback_steps, scores_steps = interactor.iterate(
-        steps=100,
-        k=10,
-        random_rec=False,
-        max_length_input=100
-    )
+    time_start = time.time()
+    for i_step in range(999):
+        optim_scores_steps.append(
+            get_optim_score_step(
+                optim_scores=optim_scores,
+                recommender=interactor.recommender,
+                k=k,
+            )
+        )
+        _, candidates_step, feedback_step, scores_step, rec_u_embs_step = interactor.iterate(
+            steps=1,
+            k=k,
+            random_rec=False,
+            random_react=True,
+            max_length_input=100
+        )
+        candidates_steps += candidates_step
+        feedback_steps += feedback_step
+        scores_steps += scores_step
+        rec_u_embs_steps += rec_u_embs_step
+
+        time_step = time.time()
+        print("%d steps takes %f s" % (i_step + 1, time_step - time_start))
+
+    # --------------------- save results ------------------------- #
+
     with open(data_file + "_detail", "wb") as f:
         pickle.dump(
             [
-                candidates_steps_init + candidates_steps,
-                feedback_steps_init + feedback_steps,
-                scores_steps_init + scores_steps,
+                candidates_steps,
+                feedback_steps,
+                scores_steps,
+                optim_scores_steps,
+                rec_u_embs_steps
             ],
             f
         )

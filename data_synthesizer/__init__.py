@@ -1,1 +1,1 @@
-from data_synthesizer.emb_generate import generate_emb, save_emb, uv_emb_synthesize
+from data_synthesizer.emb_generate import generate_emb, save_emb, uv_emb_synthesize, emb_synthesize

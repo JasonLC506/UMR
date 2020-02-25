@@ -48,10 +48,12 @@ class Recommender(object):
                     self.n_items, size=k, replace=False
                 ) for _ in range(user_data_loader.n_users_effect)
             ]
+            u_embs = [None for _ in range(len(cands))]
         else:
             cands = []
+            u_embs = []
             for i in range(user_data_loader.n_users_effect):
-                scores = self.model.predict(
+                scores, u_emb = self.model.predict(
                     data_generator=user_data_loader
                 )
                 cand = cand_ind = self.exclude_sort(
@@ -60,6 +62,7 @@ class Recommender(object):
                     k=k,
                 )
                 cands.append(cand)
+                u_embs.append(np.squeeze(u_emb))
         return cands
 
     def update(
@@ -130,10 +133,12 @@ class RecommenderSeq(Recommender):
                     self.n_items, size=k, replace=False
                 ) for _ in range(user_data_loader.n_sequences_effect)
             ]
+            u_embs = [None for _ in range(len(cands))]
         else:
             cands = []
+            u_embs = []
             for i in range(user_data_loader.n_sequences_effect):
-                scores = self.model.predict(
+                scores, u_emb = self.model.predict(
                     data_generator=user_data_loader
                 )
                 cand = cand_ind = self.exclude_sort(
@@ -142,4 +147,5 @@ class RecommenderSeq(Recommender):
                     k=k,
                 )
                 cands.append(cand)
-        return cands
+                u_embs.append(np.squeeze(u_emb[0]))    # user emb input should be the same for batches of candidates
+        return cands, u_embs

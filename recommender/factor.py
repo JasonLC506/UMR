@@ -65,7 +65,7 @@ class Factor(NN):
 
     def _setup_net(self):
         self._setup_emb()
-        ue = self._get_u_emb()
+        self.ue = ue = self._get_u_emb()
         ve = tf.nn.embedding_lookup(
             params=self.v_emb,
             ids=self.v
@@ -115,10 +115,10 @@ class Factor(NN):
         results = self._feed_forward_w_generator(
             data_generator=data_generator,
             fn_feed_dict=self._fn_feed_dict_predict,
-            output=[self.r_logit],
+            output=[self.r_logit, self.ue],
             session=self.sess,
             batch_size=self.model_spec["batch_size"]
-        )[0]
+        )
         return results
 
     def _fn_feed_dict_predict(

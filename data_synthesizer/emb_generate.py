@@ -60,3 +60,21 @@ def uv_emb_synthesize(
         save_emb(user_embs, save_path + "user")
         save_emb(item_embs, save_path + "item")
     return user_embs, item_embs
+
+
+def emb_synthesize(
+        n,
+        model_spec,
+        save_path="../data/emb/item",
+):
+    """
+    generate item embeddings
+    """
+    embs = generate_emb(
+        n=n,
+        dim=model_spec["dim"],
+        model_spec=model_spec
+    )
+    if save_path is not None:
+        save_emb(embs, save_path)
+    return embs

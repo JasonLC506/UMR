@@ -255,20 +255,22 @@ class DataLoaderItem(DataLoaderValid):
     @staticmethod
     def negative_sampling(
             n_items,
+            n_sample=1
     ):
-        return np.random.choice(n_items)
+        return np.random.choice(n_items, size=n_sample).squeeze()
 
     def sequence_generate(self):
         sequence_data = []
         for length in range(
-            self.model_spec["min_length_input"],
-            self.model_spec["max_length_input"] + 1
+            self.model_spec["min_length_sample"],
+            self.model_spec["max_length_sample"] + 1
         ):
             sequence_data += self._sequence_generate(
                 data_u_dict=self.data_u_dict,
                 length=length,
                 n=self.model_spec["n_seq_per_user"]
             )
+            print("n_sequence=%d from length=%d" % (len(sequence_data), length))
         sequence_data = list(map(
             lambda x: [
                 x[0].shape[0],
@@ -314,7 +316,7 @@ class DataLoaderItem(DataLoaderValid):
         """
         data = []
         for uid in range(len(data_u_dict)):
-            seq = data_u_dict[uid]
+            seq = np.array(data_u_dict[uid][1])
             seq_length = seq.shape[0]
             if seq_length < length + n:
                 continue                    # not enough sequence to build sample
@@ -371,6 +373,23 @@ class DataLoaderItemValid(DataLoaderItem):
                 "hist_length": np.array([self.sequence_data[self.i_sequence_effect][0]], dtype=np.float32),
                 "v": items[batch_index].astype(np.int64)
             }
+
+    def candidate_items(
+            self,
+            **kwargs
+    ):
+        if "n_neg_sample" not in self.model_spec:
+            return np.arange(self.n_items)
+        else:
+            cands = self.negative_sampling(
+                n_items=self.n_items,
+                n_sample=self.model_spec["n_neg_sample"]
+            )
+            return np.append(
+                [self.sequence_data[self.i_sequence_effect][2]],
+                cands,
+                axis=0
+            )
 
 
 class DataLoaderItemPredict(DataLoaderItemValid):
